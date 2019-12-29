@@ -280,7 +280,7 @@ unittest
     alias fix1 = FixedPoint!1;
     alias fix2 = FixedPoint!2;
     alias fix3 = FixedPoint!3;
-    import std.stdio;
+    import std.stdio : writeln;
 
     // Fundamentals
 

@@ -5,5 +5,11 @@
 	"copyright": "Copyright © 2019, Jan Hoenig",
 	"description": "Decimal fixed point type",
 	"license": "BSL-1.0",
-	"name": "fixedpoint"
+	"name": "fixedpoint",
+  "sourcePaths": [
+    "fixedpoint/"
+  ],
+  "importPaths": [
+    "fixedpoint/"
+  ]
 }
