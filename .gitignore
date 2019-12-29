@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/fixedpoint
+fixedpoint.so
+fixedpoint.dylib
+fixedpoint.dll
+fixedpoint.a
+fixedpoint.lib
+fixedpoint-test-*
+*.exe
+*.o
+*.obj
+*.lst
