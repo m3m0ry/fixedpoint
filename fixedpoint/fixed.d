@@ -1,27 +1,29 @@
-module fixedpoint.fixeddecimal;
+module fixedpoint.fixed;
 
+import std.stdio;
 import std.conv : to;
+import std.range : repeat;
 import std.format : format;
 import std.string : split;
 import std.math : sgn, abs, round;
 import std.traits;
 
-/// FixedDecimal Class
-struct FixedDecimal(int scaling)
+/// Fixed Class
+struct Fixed(int scaling)
 {
-    /// Value of the FixedDecimal
+    /// Value of the Fixed
     long value = 0;
     /// Factor of the scaling
     enum factor = 10 ^^ scaling;
 
     //TODO floating, div, mult, modulo, power? ceil, floor, init, documentation&examples
 
-    /// Smalest FixedDecimal
-    static immutable FixedDecimal min = make(long.min);
-    /// Largest FixedDecimal
-    static immutable FixedDecimal max = make(long.max);
+    /// Smalest Fixed
+    static immutable Fixed min = make(long.min);
+    /// Largest Fixed
+    static immutable Fixed max = make(long.max);
 
-    /// Create a new FixedDecimal, given a integral
+    /// Create a new Fixed, given a integral
     this(T)(T i) if (isIntegral!T)
     {
         value = i * factor;
@@ -29,14 +31,14 @@ struct FixedDecimal(int scaling)
     ///
     unittest
     {
-        auto p1 = FixedDecimal!4(1);
+        auto p1 = Fixed!4(1);
         assert(p1.value == 1 * 10 ^^ 4);
 
-        auto p2 = FixedDecimal!5(1);
+        auto p2 = Fixed!5(1);
         assert(p2.value == 1 * 10 ^^ 5);
     }
 
-    /// Create a new FixedDecimal give a floating point number
+    /// Create a new Fixed give a floating point number
     this(T)(T i) if (isFloatingPoint!T)
     {
       value = (i * factor).round.to!long;
@@ -44,17 +46,17 @@ struct FixedDecimal(int scaling)
     ///
     unittest
     {
-        auto p = FixedDecimal!4(1.1);
+        auto p = Fixed!4(1.1);
         assert(p.value == 1.1 * 10 ^^ 4);
     }
 
-    /// Create a new FixPoint given a string
+    /// Create a new Fixed struct given a string
     this(string s)
     {
         if (s != "")
         {
             auto spl = s.split(".");
-            value = spl[0].to!long * factor;
+            value = format!"%s%(%s%)"(spl[0], 0.repeat(scaling)).to!long;
             if (spl.length > 1 && spl[1] != "")
             {
                 if (spl[1].length > scaling)
@@ -67,38 +69,38 @@ struct FixedDecimal(int scaling)
     ///
     unittest
     {
-        auto p1 = FixedDecimal!4("1.1");
+        auto p1 = Fixed!4("1.1");
         assert(p1.value == 11_000);
 
-        auto p2 = FixedDecimal!4("1.");
+        auto p2 = Fixed!4("1.");
         assert(p2.value == 10_000);
 
-        auto p3 = FixedDecimal!4("0");
+        auto p3 = Fixed!4("0");
         assert(p3.value == 0);
 
-        auto p4 = FixedDecimal!4("");
+        auto p4 = Fixed!4("");
         assert(p4.value == 0);
     }
 
-    /// Direct construction of a FixedDecima
-    static pure nothrow FixedDecimal make(long v)
+    /// Direct construction of a Fixed struct
+    static pure nothrow Fixed make(long v)
     {
-        FixedDecimal fixed;
+        Fixed fixed;
         fixed.value = v;
         return fixed;
     }
     ///
     unittest
     {
-        auto p1 = FixedDecimal!3.make(1);
+        auto p1 = Fixed!3.make(1);
         assert(p1.value == 1);
 
-        auto p2 = FixedDecimal!3(1);
+        auto p2 = Fixed!3(1);
         assert(p2.value == 1000);
     }
 
 
-    void opAssign(FixedDecimal p)
+    void opAssign(Fixed p)
     {
         value = p.value;
     }
@@ -108,11 +110,11 @@ struct FixedDecimal(int scaling)
     }
     void opAssign(string s)
     {
-        auto tmp = FixedDecimal(s);
+        auto tmp = Fixed(s);
         value = tmp.value;
     }
 
-    void opOpAssign(string op)(FixedDecimal o)
+    void opOpAssign(string op)(Fixed o)
     {
         value = mixin("value" ~ op ~ "o.value");
     }
@@ -133,18 +135,18 @@ struct FixedDecimal(int scaling)
         return format!"%s%d.%0*d"( sign, (value / factor).abs, scaling, (value % factor).abs);
     }
 
-    /// Creating FixedDecimalfrom a string, needed by vibed: http://vibed.org/api/vibe.data.serialization/isStringSerializable
-    static FixedDecimal fromString(string v)
+    /// Creating Fixed from a string, needed by vibed: http://vibed.org/api/vibe.data.serialization/isStringSerializable
+    static Fixed fromString(string v)
     {
-        return FixedDecimal(v);
+        return Fixed(v);
     }
 
-    bool opEquals(const FixedDecimal other) const
+    bool opEquals(const Fixed other) const
     {
         return other.value == value;
     }
 
-    bool opEquals(point)(const FixedDecimal!point other) const
+    bool opEquals(point)(const Fixed!point other) const
     {
         return other.value * other.factor == value * factor;
     }
@@ -154,7 +156,7 @@ struct FixedDecimal(int scaling)
         return value == other * factor;
     }
 
-    int opCmp(const FixedDecimal other) const
+    int opCmp(const Fixed other) const
     {
         if (value < other.value)
             return -1;
@@ -164,7 +166,7 @@ struct FixedDecimal(int scaling)
             return 0;
     }
 
-    //int opCmp(point)(const FixedDecimal point other) const
+    //int opCmp(point)(const Fixed point other) const
     //{
     //    //TODO
     //    return 0;
@@ -182,32 +184,32 @@ struct FixedDecimal(int scaling)
 
     unittest
     {
-        auto p = FixedDecimal!4(3);
-        assert(p == FixedDecimal!4(3));
+        auto p = Fixed!4(3);
+        assert(p == Fixed!4(3));
         //assert(p == 3.0);
         assert(p == 3);
-        assert(p == FixedDecimal!4(3));
-        auto p2 = FixedDecimal!4(2);
+        assert(p == Fixed!4(3));
+        auto p2 = Fixed!4(2);
         assert(p > p2);
         assert(p2 < p);
     }
 
-    FixedDecimal opUnary(string s)() if (s == "--" || s == "++")
+    Fixed opUnary(string s)() if (s == "--" || s == "++")
     {
         mixin("value" ~ s[0] ~ "= factor;");
         return this;
     }
 
-    FixedDecimal opUnary(string s)() if (s == "-" || s == "+")
+    Fixed opUnary(string s)() if (s == "-" || s == "+")
     {
-        auto f = FixedDecimal();
+        auto f = Fixed();
         f.value = mixin(s ~ "value");
         return f;
     }
 
     unittest
     {
-        auto p = FixedDecimal!1(1.1);
+        auto p = Fixed!1(1.1);
         assert(to!string(p) == "1.1");
         p++;
         ++p;
@@ -215,7 +217,7 @@ struct FixedDecimal(int scaling)
         assert((-p).value == -31);
     }
 
-    T opCast(T: FixedDecimal!point, int point)() const
+    T opCast(T: Fixed!point, int point)() const
     {
         static if (point > scaling)
             return T.make(value * (10 ^^ (point - scaling)));
@@ -237,50 +239,50 @@ struct FixedDecimal(int scaling)
 
     unittest
     {
-        auto p = FixedDecimal!4(1.1);
+        auto p = Fixed!4(1.1);
         assert(cast(int) p == 1);
         assert(p.to!int == 1);
         assert(p.to!double == 1.1);
         import std.stdio;
-        assert(p.to!(FixedDecimal!5).value == 110_000);
+        assert(p.to!(Fixed!5).value == 110_000);
     }
 
-    FixedDecimal opBinary(string op, T)(T rhs) if (isIntegral!T)
+    Fixed opBinary(string op, T)(T rhs) if (isIntegral!T)
     {
-        return FixedDecimal.make(mixin("value" ~ op ~ "(rhs * factor)"));
+        return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
     }
     
-    FixedDecimal opBinary(string op, T)(T rhs) if (isFloatingPoint!T)
+    Fixed opBinary(string op, T)(T rhs) if (isFloatingPoint!T)
     {
-        return FixedDecimal.make(mixin("value" ~ op ~ "(rhs * factor).round.to!long"));
+        return Fixed.make(mixin("value" ~ op ~ "(rhs * factor).round.to!long"));
     }
 
-    FixedDecimal opBinaryRight(string op, T)(T lhs) if (isIntegral!T)
+    Fixed opBinaryRight(string op, T)(T lhs) if (isIntegral!T)
     {
-        return FixedDecimal.make(mixin("(lhs * factor)" ~ op ~ "value"));
+        return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
     }
 
-    FixedDecimal opBinaryRight(string op, T)(T lhs) if (isFloatingPoint!T)
+    Fixed opBinaryRight(string op, T)(T lhs) if (isFloatingPoint!T)
     {
-        return FixedDecimal.make(mixin("(lhs * factor).round.to!long" ~ op ~ "value"));
+        return Fixed.make(mixin("(lhs * factor).round.to!long" ~ op ~ "value"));
     }
 
-    FixedDecimal opBinary(string op)(FixedDecimal rhs)
+    Fixed opBinary(string op)(Fixed rhs)
             if (op == "+" || op == "-")
     {
-        return FixedDecimal.make(mixin("value" ~ op ~ "rhs.value"));
+        return Fixed.make(mixin("value" ~ op ~ "rhs.value"));
     }
 
     /*
-    FixedDecimalpoint opBinary(string op, point)(FixedDecimal!oint rhs) if (op == "+" || op == "-")
+    Fixed opBinary(string op, point)(Fixed!oint rhs) if (op == "+" || op == "-")
     {
         static if (scaling > point)
-            return FixedDecimalpoint(mixin("(value * 10^^(scaling - point))" ~ op ~ "rhs.value"));
+            return Fixed(mixin("(value * 10^^(scaling - point))" ~ op ~ "rhs.value"));
         else
             return FixedDecimalscaling(mixin("value" ~ op ~ "(rhs.value * 10^^(point - scaling))"));
     }
 
-    FixedDecimalopBinary(string op)(FixedDecimal hs) if (op == "*")
+    FixedDecimalopBinary(string op)(Fixed hs) if (op == "*")
     {
         return FixedDecimalvalue * rhs.value, point + rhs.point);
     }
@@ -289,12 +291,12 @@ struct FixedDecimal(int scaling)
     ///
     unittest
     {
-        auto p1 = FixedDecimal!4(1);
-        auto p2 = FixedDecimal!4(2);
+        auto p1 = Fixed!4(1);
+        auto p2 = Fixed!4(2);
         assert(p1 + 1 == 2);
         assert(p1 + p2 == 3);
-        auto p3 = FixedDecimal!2(2);
-        auto p4 = p2 + p3.to!(FixedDecimal!4);
+        auto p3 = Fixed!2(2);
+        auto p4 = p2 + p3.to!(Fixed!4);
         assert(p4 == 4);
     }
 
@@ -307,10 +309,11 @@ struct FixedDecimal(int scaling)
 
 unittest
 {
-    alias fix1 = FixedDecimal!1;
-    alias fix2 = FixedDecimal!2;
-    alias fix3 = FixedDecimal!3;
     import std.stdio : writeln;
+    import std.exception : assertThrown;
+    alias fix1 = Fixed!1;
+    alias fix2 = Fixed!2;
+    alias fix3 = Fixed!3;
 
     // Fundamentals
 
@@ -347,6 +350,8 @@ unittest
     assert(fix1(62).value == 620);
     assert(fix2(-30).value == -3000);
     assert(fix3("120").value == 120_000);
+    assertThrown(Fixed!10("12345678901234567"));
+    writeln(Fixed!10("12345678901234567").toString);
     assert(fix2(24.6).value == 2460);
     assert(fix2(-27.2).value == -2720);
     assert(fix2(16.1f).value == 1610);
@@ -439,21 +444,21 @@ unittest
     assert(amount);
     assert(!fix2(0));
 
-    auto cv1 = amount.to!(FixedDecimal!1);
+    auto cv1 = amount.to!(Fixed!1);
     assert(cv1.factor == 10);
     assert(cv1.value == 220);
-    auto cv3 = amount.to!(FixedDecimal!3);
+    auto cv3 = amount.to!(Fixed!3);
     assert(cv3.factor == 1000);
     assert(cv3.value == 22000);
 
     fix3 amt3 = 3.752;
-    auto amt2 = amt3.to!(FixedDecimal!2);
+    auto amt2 = amt3.to!(Fixed!2);
     assert(amt2.factor == 100);
     assert(amt2.value == 375);
-    auto amt1 = amt3.to!(FixedDecimal!1);
+    auto amt1 = amt3.to!(Fixed!1);
     assert(amt1.factor == 10);
     assert(amt1.value == 37);
-    auto amt0 = amt3.to!(FixedDecimal!0);
+    auto amt0 = amt3.to!(Fixed!0);
     assert(amt0.factor == 1);
     assert(amt0.value == 3);
 
@@ -535,7 +540,7 @@ unittest
     //amount /= 12;
     //assert(amount.value == 431);
 
-    assert(FixedDecimal!2.fromString("2.5") == FixedDecimal!2("2.5"));
+    assert(Fixed!2.fromString("2.5") == Fixed!2("2.5"));
 
     // The following template is copied from vibe.d sources
     // Copyright (c) 2012-2018 RejectedSoftware e.K.
@@ -549,7 +554,7 @@ unittest
             && is(typeof(T.fromString("")) : T);
     }
 
-    alias number = FixedDecimal!2;
+    alias number = Fixed!2;
     static assert(isStringSerializable!number);
 
     // More tests.
