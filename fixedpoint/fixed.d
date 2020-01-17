@@ -1,8 +1,8 @@
 module fixedpoint.fixed;
 
-import std.stdio;
 import std.conv : to;
-import std.range : repeat;
+import std.algorithm : splitter;
+import std.range : repeat, chain, empty;
 import std.format : format;
 import std.string : split;
 import std.math : sgn, abs, round;
@@ -51,18 +51,20 @@ struct Fixed(int scaling)
     }
 
     /// Create a new Fixed struct given a string
-    this(string s)
+    this(Range)(Range s) if (isNarrowString!Range)
     {
-        if (s != "")
+        if (!s.empty)
         {
-            auto spl = s.split(".");
-            value = format!"%s%(%s%)"(spl[0], 0.repeat(scaling)).to!long;
-            if (spl.length > 1 && spl[1] != "")
+            auto spl = s.splitter(".");
+            value = spl.front.chain('0'.repeat(scaling)).to!long;
+            spl.popFront;
+            if (!spl.empty && spl.front.length > 0)
             {
-                if (spl[1].length > scaling)
-                    value += value.sgn * (spl[1].to!long / 10 ^^ (spl[1].length - scaling));
+                const auto decimal = spl.front;
+                if (decimal.length > scaling)
+                    value += value.sgn * decimal[0..scaling].to!long;
                 else
-                    value += value.sgn * (spl[1].to!long * 10 ^^ (scaling - spl[1].length));
+                    value += value.sgn * decimal.chain('0'.repeat(scaling - decimal.length)).to!long;
             }
         }
     }
@@ -350,8 +352,11 @@ unittest
     assert(fix1(62).value == 620);
     assert(fix2(-30).value == -3000);
     assert(fix3("120").value == 120_000);
+    assert(fix3("120".dup).value == 120_000);
+    assert(fix3("120.123").value == 120_123);
+    assert(fix3("120.1234").value == 120_123);
     assertThrown(Fixed!10("12345678901234567"));
-    writeln(Fixed!10("12345678901234567").toString);
+    //Fixed!10("12345678901234567");
     assert(fix2(24.6).value == 2460);
     assert(fix2(-27.2).value == -2720);
     assert(fix2(16.1f).value == 1610);
