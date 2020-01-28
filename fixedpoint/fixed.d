@@ -3,7 +3,7 @@ module fixedpoint.fixed;
 import std.conv : to;
 import std.algorithm : splitter;
 import std.range : repeat, chain, empty;
-import std.format : format;
+import std.format : format, formattedWrite;
 import std.string : split;
 import std.math : sgn, abs, round;
 import std.traits;
@@ -126,6 +126,12 @@ struct Fixed(int scaling)
     {
         string sign = value.sgn == -1 ? "-" : "";
         return format!"%s%d.%0*d"( sign, (value / factor).abs, scaling, (value % factor).abs);
+    }
+
+    void toString(void delegate(const(char)[]) dg) const
+    {
+        string sign = value.sgn == -1 ? "-" : "";
+        dg.formattedWrite!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
     }
 
     /// Creating Fixed from a string, needed by vibed: http://vibed.org/api/vibe.data.serialization/isStringSerializable
@@ -276,9 +282,19 @@ struct Fixed(int scaling)
         return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if (isFloatingPoint!T)
+    Fixed opBinaryRight(string op, T)(T lhs) if ((op == "+" || op == "-") && isFloatingPoint!T)
     {
         return Fixed.make(mixin("(lhs * factor).round.to!long" ~ op ~ "value"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if (op == "*" && isFloatingPoint!T)
+    {
+        return Fixed.make(mixin("(lhs" ~ op ~ "value).round.to!long"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if (op == "/" && isFloatingPoint!T)
+    {
+        return Fixed.make(mixin("(((lhs * factor)" ~ op ~ "value) * factor).round.to!long"));
     }
 
     Fixed opBinary(string op)(Fixed rhs)
@@ -512,9 +528,9 @@ unittest
 
     assert((9.8 + op1).value == 1503);
     assert((9.8 - op1).value == 457);
-    //assert(9.8 * op1 == 51.25);
+    assert((9.8 * op1).value == 5125);
 
-    //assert(9.8 / op1 == 1.87);
+    assert((9.8 / op1).value == 187);
 
     assert(op1 != op2);
     assert(op1 == fix2(5.23));
