@@ -56,16 +56,14 @@ struct Fixed(int scaling)
         if (!s.empty)
         {
             auto spl = s.splitter(".");
-            value = spl.front.chain('0'.repeat(scaling)).to!long;
+            auto frontItem = spl.front;
             spl.popFront;
-            if (!spl.empty && spl.front.length > 0)
-            {
-                const auto decimal = spl.front;
-                if (decimal.length > scaling)
-                    value += value.sgn * decimal[0..scaling].to!long;
-                else
-                    value += value.sgn * decimal.chain('0'.repeat(scaling - decimal.length)).to!long;
-            }
+            typeof(frontItem) decimal;
+            if (!spl.empty)
+                decimal = spl.front;
+            if (decimal.length > scaling)
+                decimal = decimal[0 .. scaling]; // truncate
+            value = chain(frontItem, decimal, '0'.repeat(scaling - decimal.length)).to!long;
         }
     }
     ///
