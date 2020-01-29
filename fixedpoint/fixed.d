@@ -3,7 +3,7 @@ module fixedpoint.fixed;
 import std.conv : to;
 import std.algorithm : splitter;
 import std.range : repeat, chain, empty;
-import std.format : format;
+import std.format : format, formattedWrite;
 import std.string : split;
 import std.math : sgn, abs, round;
 import std.traits;
@@ -56,16 +56,14 @@ struct Fixed(int scaling)
         if (!s.empty)
         {
             auto spl = s.splitter(".");
-            value = spl.front.chain('0'.repeat(scaling)).to!long;
+            auto frontItem = spl.front;
             spl.popFront;
-            if (!spl.empty && spl.front.length > 0)
-            {
-                const auto decimal = spl.front;
-                if (decimal.length > scaling)
-                    value += value.sgn * decimal[0..scaling].to!long;
-                else
-                    value += value.sgn * decimal.chain('0'.repeat(scaling - decimal.length)).to!long;
-            }
+            typeof(frontItem) decimal;
+            if (!spl.empty)
+                decimal = spl.front;
+            if (decimal.length > scaling)
+                decimal = decimal[0 .. scaling]; // truncate
+            value = chain(frontItem, decimal, '0'.repeat(scaling - decimal.length)).to!long;
         }
     }
     ///
@@ -102,39 +100,38 @@ struct Fixed(int scaling)
     }
 
 
-    void opAssign(Fixed p)
+    Fixed opAssign(Fixed p)
     {
         value = p.value;
+        return this;
     }
-    void opAssign(T)(T n) if (isNumeric!T)
+    Fixed opAssign(T)(T n) if (isNumeric!T)
     {
         value = to!long(n * factor);
+        return this;
     }
-    void opAssign(string s)
+    Fixed opAssign(string s)
     {
-        auto tmp = Fixed(s);
-        value = tmp.value;
-    }
-
-    void opOpAssign(string op)(Fixed o)
-    {
-        value = mixin("value" ~ op ~ "o.value");
+        value = Fixed(s).value;
+        return this;
     }
 
-    void opOpAssign(string op, T)(T n) if (isIntegral!T)
+    Fixed opOpAssign(string op, T)(T n) if (isNumeric!T || is(T == Fixed))
     {
-        value = mixin("value" ~ op ~ "(n * factor)");
-    }
-
-    void opOpAssign(string op, T)(T n) if (isFloatingPoint!T)
-    {
-        value = mixin("value" ~ op ~ "(n * factor).round.to!long");
+        // just forward to opBinary.
+        return this = opBinary!op(n);
     }
 
     string toString() const
     {
         string sign = value.sgn == -1 ? "-" : "";
         return format!"%s%d.%0*d"( sign, (value / factor).abs, scaling, (value % factor).abs);
+    }
+
+    void toString(void delegate(const(char)[]) dg) const
+    {
+        string sign = value.sgn == -1 ? "-" : "";
+        dg.formattedWrite!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
     }
 
     /// Creating Fixed from a string, needed by vibed: http://vibed.org/api/vibe.data.serialization/isStringSerializable
@@ -249,24 +246,55 @@ struct Fixed(int scaling)
         assert(p.to!(Fixed!5).value == 110_000);
     }
 
-    Fixed opBinary(string op, T)(T rhs) if (isIntegral!T)
+    Fixed opBinary(string op, T)(T rhs) if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
     }
     
-    Fixed opBinary(string op, T)(T rhs) if (isFloatingPoint!T)
+    Fixed opBinary(string op, T)(T rhs) if ((op == "*" || op == "/") && isIntegral!T)
+    {
+        return Fixed.make(mixin("value" ~ op ~ "rhs"));
+    }
+
+    Fixed opBinary(string op, T)(T rhs) if ((op == "+" || op == "-") && isFloatingPoint!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "(rhs * factor).round.to!long"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if (isIntegral!T)
+    Fixed opBinary(string op, T)(T rhs) if ((op == "*" || op == "/") && isFloatingPoint!T)
+    {
+        return Fixed.make(mixin("(value" ~ op ~ "rhs).round.to!long"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if (isFloatingPoint!T)
+    Fixed opBinaryRight(string op, T)(T lhs) if (op == "*" && isIntegral!T)
+    {
+        return Fixed.make(mixin("lhs" ~ op ~ "value"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if (op == "/" && isIntegral!T)
+    {
+        // this might overflow easily. But this is the correct mechanism.
+        return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if ((op == "+" || op == "-") && isFloatingPoint!T)
     {
         return Fixed.make(mixin("(lhs * factor).round.to!long" ~ op ~ "value"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if (op == "*" && isFloatingPoint!T)
+    {
+        return Fixed.make(mixin("(lhs" ~ op ~ "value).round.to!long"));
+    }
+
+    Fixed opBinaryRight(string op, T)(T lhs) if (op == "/" && isFloatingPoint!T)
+    {
+        return Fixed.make(mixin("(((lhs * factor)" ~ op ~ "value) * factor).round.to!long"));
     }
 
     Fixed opBinary(string op)(Fixed rhs)
@@ -297,6 +325,8 @@ struct Fixed(int scaling)
         auto p2 = Fixed!4(2);
         assert(p1 + 1 == 2);
         assert(p1 + p2 == 3);
+        assert(p1 * 2 == 2);
+        assert(cast(double)(p1 / 2) == 0.5);
         auto p3 = Fixed!2(2);
         auto p4 = p2 + p3.to!(Fixed!4);
         assert(p4 == 4);
@@ -304,7 +334,7 @@ struct Fixed(int scaling)
 
     size_t toHash() const
     {
-        return value;
+        return cast(size_t)value;
     }
 }
 
@@ -481,26 +511,26 @@ unittest
 
     assert((op1 + 10).value == 1523);
     assert((op1 - 10).value == -477);
-    //assert(op1 * 10 == 52.3);
-    //assert(op1 / 10 == 0.52);
+    assert((op1 * 10).value == 5230);
+    assert((op1 / 10).value == 52);
     //assert(op1 % 10 == 5.23);
 
     assert((10 + op1).value == 1523);
     assert((10 - op1).value == 477);
-    //assert(10 * op1 == 52.3);
-    //assert(10 / op1 == 1.91);
+    assert((10 * op1).value == 5230);
+    assert((10 / op1).value == 191);
     //assert(10 % op1 == 4.77);
 
     assert((op1 + 9.8).value == 1503);
     assert((op1 - 9.8).value == -457);
-    //assert(op1 * 9.8 == 51.25);
-    //assert(op1 / 9.8 == 0.53);
+    assert((op1 * 9.8).value == 5125);
+    assert((op1 / 9.8).value == 53);
 
     assert((9.8 + op1).value == 1503);
     assert((9.8 - op1).value == 457);
-    //assert(9.8 * op1 == 51.25);
+    assert((9.8 * op1).value == 5125);
 
-    //assert(9.8 / op1 == 1.87);
+    assert((9.8 / op1).value == 187);
 
     assert(op1 != op2);
     assert(op1 == fix2(5.23));
@@ -539,11 +569,11 @@ unittest
     amount += another;
     assert(amount.value == 3450);
 
-    //amount *= 1.5;
-    //assert(amount.value == 5175);
+    amount *= 1.5;
+    assert(amount.value == 5175);
 
-    //amount /= 12;
-    //assert(amount.value == 431);
+    amount /= 12;
+    assert(amount.value == 431);
 
     assert(Fixed!2.fromString("2.5") == Fixed!2("2.5"));
 
@@ -585,17 +615,17 @@ unittest
     amount = 50;
     assert(amount.value == 5000);
 
-    //another = amount * 2;
-    //assert(another.value == 10000);
-    //amount *= 3;
-    //assert(amount.value == 15000);
+    another = amount * 2;
+    assert(another.value == 10000);
+    amount *= 3;
+    assert(amount.value == 15000);
 
     amount = "30";
     assert(amount.value == 3000);
 
-    //amount = 295;
-    //amount /= 11;
-    //assert(amount.value == 2681);
+    amount = 295;
+    amount /= 11;
+    assert(amount.value == 2681);
     //assert(amount == 26.81);
 
     amount = 295;
@@ -613,11 +643,11 @@ unittest
 
     assert(another.value == -2980);
 
-    //another = amount / 1.6;
-    //assert(another.value == 1875);
+    another = amount / 1.6;
+    assert(another.value == 1875);
 
-    //another = amount * 1.56;
-    //assert(another.value == 4680);
+    another = amount * 1.56;
+    assert(another.value == 4680);
 
     fix1 a = 3.2;
     fix2 b = 1.15;
@@ -625,10 +655,10 @@ unittest
     assert(a.value == 32);
     assert(b.value == 115);
 
-    //assert(fix2(334) / 15 == 22.26);
+    assert((fix2(334) / 15).value == 2226);
     //assert(fix2(334) % 10 == 4);
 
-    //assert(334 / fix2(15.3) == 21.83);
+    assert((334 / fix2(15.3)).value == 2183);
     //assert(334 % fix2(15.3) == 12.7);
 
     // mult function
