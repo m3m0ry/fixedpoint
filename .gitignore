@@ -12,3 +12,4 @@ fixedpoint-test-*
 *.o
 *.obj
 *.lst
+.vscode

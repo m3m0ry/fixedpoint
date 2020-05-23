@@ -9,19 +9,19 @@ import std.math : sgn, abs, round;
 import std.traits;
 
 /// Fixed Class
-struct Fixed(int scaling)
+struct Fixed(int scaling, V = long) if (isIntegral!V)
 {
     /// Value of the Fixed
-    long value = 0;
+    V value = 0;
     /// Factor of the scaling
     enum factor = 10 ^^ scaling;
 
     //TODO floating, div, mult, modulo, power? ceil, floor, init, documentation&examples
 
     /// Smalest Fixed
-    static immutable Fixed min = make(long.min);
+    static immutable Fixed min = make(V.min);
     /// Largest Fixed
-    static immutable Fixed max = make(long.max);
+    static immutable Fixed max = make(V.max);
 
     /// Create a new Fixed, given a integral
     this(T)(T i) if (isIntegral!T)
@@ -41,7 +41,7 @@ struct Fixed(int scaling)
     /// Create a new Fixed give a floating point number
     this(T)(T i) if (isFloatingPoint!T)
     {
-      value = (i * factor).round.to!long;
+        value = (i * factor).round.to!V;
     }
     ///
     unittest
@@ -63,7 +63,7 @@ struct Fixed(int scaling)
                 decimal = spl.front;
             if (decimal.length > scaling)
                 decimal = decimal[0 .. scaling]; // truncate
-            value = chain(frontItem, decimal, '0'.repeat(scaling - decimal.length)).to!long;
+            value = chain(frontItem, decimal, '0'.repeat(scaling - decimal.length)).to!V;
         }
     }
     ///
@@ -83,7 +83,7 @@ struct Fixed(int scaling)
     }
 
     /// Direct construction of a Fixed struct
-    static pure nothrow Fixed make(long v)
+    static pure nothrow Fixed make(V v)
     {
         Fixed fixed;
         fixed.value = v;
@@ -99,17 +99,18 @@ struct Fixed(int scaling)
         assert(p2.value == 1000);
     }
 
-
     Fixed opAssign(Fixed p)
     {
         value = p.value;
         return this;
     }
+
     Fixed opAssign(T)(T n) if (isNumeric!T)
     {
-        value = to!long(n * factor);
+        value = to!V(n * factor);
         return this;
     }
+
     Fixed opAssign(string s)
     {
         value = Fixed(s).value;
@@ -125,7 +126,7 @@ struct Fixed(int scaling)
     string toString() const
     {
         string sign = value.sgn == -1 ? "-" : "";
-        return format!"%s%d.%0*d"( sign, (value / factor).abs, scaling, (value % factor).abs);
+        return format!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
     }
 
     void toString(void delegate(const(char)[]) dg) const
@@ -216,7 +217,7 @@ struct Fixed(int scaling)
         assert((-p).value == -31);
     }
 
-    T opCast(T: Fixed!point, int point)() const
+    T opCast(T : Fixed!point, int point)() const
     {
         static if (point > scaling)
             return T.make(value * (10 ^^ (point - scaling)));
@@ -226,7 +227,7 @@ struct Fixed(int scaling)
             return this;
     }
 
-    T opCast(T: bool)() const
+    T opCast(T : bool)() const
     {
         return value != 0;
     }
@@ -243,6 +244,7 @@ struct Fixed(int scaling)
         assert(p.to!int == 1);
         assert(p.to!double == 1.1);
         import std.stdio;
+
         assert(p.to!(Fixed!5).value == 110_000);
     }
 
@@ -250,23 +252,26 @@ struct Fixed(int scaling)
     {
         return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
     }
-    
+
     Fixed opBinary(string op, T)(T rhs) if ((op == "*" || op == "/") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "rhs"));
     }
 
-    Fixed opBinary(string op, T)(T rhs) if ((op == "+" || op == "-") && isFloatingPoint!T)
+    Fixed opBinary(string op, T)(T rhs)
+            if ((op == "+" || op == "-") && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("value" ~ op ~ "(rhs * factor).round.to!long"));
+        return Fixed.make(mixin("value" ~ op ~ "(rhs * factor).round.to!V"));
     }
 
-    Fixed opBinary(string op, T)(T rhs) if ((op == "*" || op == "/") && isFloatingPoint!T)
+    Fixed opBinary(string op, T)(T rhs)
+            if ((op == "*" || op == "/") && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("(value" ~ op ~ "rhs).round.to!long"));
+        return Fixed.make(mixin("(value" ~ op ~ "rhs).round.to!V"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if ((op == "+" || op == "-") && isIntegral!T)
+    Fixed opBinaryRight(string op, T)(T lhs)
+            if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
     }
@@ -282,23 +287,23 @@ struct Fixed(int scaling)
         return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if ((op == "+" || op == "-") && isFloatingPoint!T)
+    Fixed opBinaryRight(string op, T)(T lhs)
+            if ((op == "+" || op == "-") && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("(lhs * factor).round.to!long" ~ op ~ "value"));
+        return Fixed.make(mixin("(lhs * factor).round.to!V" ~ op ~ "value"));
     }
 
     Fixed opBinaryRight(string op, T)(T lhs) if (op == "*" && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("(lhs" ~ op ~ "value).round.to!long"));
+        return Fixed.make(mixin("(lhs" ~ op ~ "value).round.to!V"));
     }
 
     Fixed opBinaryRight(string op, T)(T lhs) if (op == "/" && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("(((lhs * factor)" ~ op ~ "value) * factor).round.to!long"));
+        return Fixed.make(mixin("(((lhs * factor)" ~ op ~ "value) * factor).round.to!V"));
     }
 
-    Fixed opBinary(string op)(Fixed rhs)
-            if (op == "+" || op == "-")
+    Fixed opBinary(string op)(Fixed rhs) if (op == "+" || op == "-")
     {
         return Fixed.make(mixin("value" ~ op ~ "rhs.value"));
     }
@@ -334,15 +339,15 @@ struct Fixed(int scaling)
 
     size_t toHash() const
     {
-        return cast(size_t)value;
+        return cast(size_t) value; // TODO might be problematic with large value types like BigInt
     }
 }
-
 
 unittest
 {
     import std.stdio : writeln;
     import std.exception : assertThrown;
+
     alias fix1 = Fixed!1;
     alias fix2 = Fixed!2;
     alias fix3 = Fixed!3;
@@ -402,11 +407,11 @@ unittest
 
     long l1 = 435;
     v2 = l1;
-    assert(v2.value == 43500);
+    assert(v2.value == 43_500);
 
     l1 = -222;
     v3 = l1;
-    assert(v3.value == -222000);
+    assert(v3.value == -222_000);
 
     // Assignment
 
@@ -484,7 +489,7 @@ unittest
     assert(cv1.value == 220);
     auto cv3 = amount.to!(Fixed!3);
     assert(cv3.factor == 1000);
-    assert(cv3.value == 22000);
+    assert(cv3.value == 22_000);
 
     fix3 amt3 = 3.752;
     auto amt2 = amt3.to!(Fixed!2);
@@ -616,9 +621,9 @@ unittest
     assert(amount.value == 5000);
 
     another = amount * 2;
-    assert(another.value == 10000);
+    assert(another.value == 10_000);
     amount *= 3;
-    assert(amount.value == 15000);
+    assert(amount.value == 15_000);
 
     amount = "30";
     assert(amount.value == 3000);
@@ -634,7 +639,7 @@ unittest
     //assert((amount / another).toString() == "26.81");
 
     another = amount + 1.3;
-    assert(another.value == 29630);
+    assert(another.value == 29_630);
 
     amount = 30;
     another = 50.2 - amount;
