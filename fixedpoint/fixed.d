@@ -166,12 +166,6 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
             return 0;
     }
 
-    //int opCmp(point)(const Fixed point other) const
-    //{
-    //    //TODO
-    //    return 0;
-    //}
-
     int opCmp(T)(const T other) const if (isNumeric!T)
     {
         if (value < other * factor)
@@ -308,6 +302,25 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         return Fixed.make(mixin("value" ~ op ~ "rhs.value"));
     }
 
+    Fixed opBinary(string op)(Fixed rhs) if (op == "*")
+    {
+        return Fixed.make(mixin("((value" ~ op ~ "rhs.value) / factor).round.to!V"));
+    }
+
+    Fixed opBinary(string op)(Fixed rhs) if (op == "/")
+    {
+        return Fixed.make(mixin("((value * factor" ~ op ~ "rhs.value * factor) / factor).round.to!V"));
+    }
+
+    //auto opBinary(string op, U, W)(Fixed!(U, W) rhs)
+    //{
+    //    static if(scaling > U) alias S = V;
+    //    else alias S = U;
+    //    static if(V.sizeof > W.sizeof) alias X = V;
+    //    else alias X = W;
+    //    return Fixed!(S, X)(mixin("value * factor" ~ op ~ "rhs.value * rhs.factor"));
+    //}
+
     /*
     Fixed opBinary(string op, point)(Fixed!oint rhs) if (op == "+" || op == "-")
     {
@@ -339,7 +352,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
 
     size_t toHash() const
     {
-        return cast(size_t) value; // TODO might be problematic with large value types like BigInt
+        return value.hashOf;
     }
 }
 
@@ -391,7 +404,6 @@ unittest
     assert(fix3("120.123").value == 120_123);
     assert(fix3("120.1234").value == 120_123);
     assertThrown(Fixed!10("12345678901234567"));
-    //Fixed!10("12345678901234567");
     assert(fix2(24.6).value == 2460);
     assert(fix2(-27.2).value == -2720);
     assert(fix2(16.1f).value == 1610);
@@ -511,8 +523,9 @@ unittest
 
     assert((op1 + op2).value == 1233);
     assert((op1 - op2).value == -187);
-    //assert((op1 * op2) == 37.13);
-    //assert((op1 / op2) == 0.73);
+    writeln(op1, " ", op2, " ", op1 / op2);
+    assert((op1 * op2).value == 3713);
+    assert((op1 / op2).value == 73);
 
     assert((op1 + 10).value == 1523);
     assert((op1 - 10).value == -477);
@@ -635,8 +648,8 @@ unittest
 
     amount = 295;
     another = 11;
-    //assert((amount / another).value == 2681);
-    //assert((amount / another).toString() == "26.81");
+    assert((amount / another).value == 2681);
+    assert((amount / another).toString() == "26.81");
 
     another = amount + 1.3;
     assert(another.value == 29_630);
@@ -665,12 +678,4 @@ unittest
 
     assert((334 / fix2(15.3)).value == 2183);
     //assert(334 % fix2(15.3) == 12.7);
-
-    // mult function
-
-    //fix2 _v1 = 1.27;
-    //fix2 _v2 = 3.45;
-    //auto _v = _v1.mult(_v2);
-    //assert(_v.sc == 4);
-    //assert(_v.value == 43815);
 }
