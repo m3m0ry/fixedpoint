@@ -16,7 +16,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
     /// Factor of the scaling
     enum factor = 10 ^^ scaling;
 
-    //TODO floating, div, mult, modulo, power? ceil, floor, init, documentation&examples
+    //TODO modulo, power? ceil, floor, init?, documentation&examples
 
     /// Smalest Fixed
     static immutable Fixed min = make(V.min);
@@ -117,7 +117,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         return this;
     }
 
-    Fixed opOpAssign(string op, T)(T n) if (isNumeric!T || is(T == Fixed))
+    Fixed opOpAssign(string op, T)(T n)
     {
         // just forward to opBinary.
         return this = opBinary!op(n);
@@ -211,12 +211,12 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         assert((-p).value == -31);
     }
 
-    T opCast(T : Fixed!point, int point)() const
+    T opCast(T : Fixed!(point, U), int point, U)() const
     {
         static if (point > scaling)
-            return T.make(value * (10 ^^ (point - scaling)));
+            return T.make(value.to!U * (10 ^^ (point - scaling)));
         else static if (point < scaling)
-            return T.make(value / (10 ^^ (scaling - point)));
+            return T.make(value.to!U / (10 ^^ (scaling - point)));
         else
             return this;
     }
@@ -312,29 +312,15 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         return Fixed.make(mixin("((value * factor" ~ op ~ "rhs.value * factor) / factor).round.to!V"));
     }
 
-    //auto opBinary(string op, U, W)(Fixed!(U, W) rhs)
-    //{
-    //    static if(scaling > U) alias S = V;
-    //    else alias S = U;
-    //    static if(V.sizeof > W.sizeof) alias X = V;
-    //    else alias X = W;
-    //    return Fixed!(S, X)(mixin("value * factor" ~ op ~ "rhs.value * rhs.factor"));
-    //}
-
-    /*
-    Fixed opBinary(string op, point)(Fixed!oint rhs) if (op == "+" || op == "-")
+    auto opBinary(string op, int r, W)(Fixed!(r, W) rhs)
     {
-        static if (scaling > point)
-            return Fixed(mixin("(value * 10^^(scaling - point))" ~ op ~ "rhs.value"));
-        else
-            return FixedDecimalscaling(mixin("value" ~ op ~ "(rhs.value * 10^^(point - scaling))"));
+        static if(scaling > r) alias S = scaling;
+        else alias S = r;
+        static if(V.sizeof > W.sizeof) alias X = V;
+        else alias X = W;
+        alias common = Fixed!(S, X);
+        return mixin("this.to!common" ~ op ~ "rhs.to!common");
     }
-
-    FixedDecimalopBinary(string op)(Fixed hs) if (op == "*")
-    {
-        return FixedDecimalvalue * rhs.value, point + rhs.point);
-    }
-    */
 
     ///
     unittest
@@ -485,6 +471,8 @@ unittest
     assert(lVal == 22);
     double dVal = cast(double) amount;
     assert(dVal == 22.0);
+    assert(dVal == amount.to!double);
+    assert(dVal * dVal == amount.to!double * amount.to!double);
     assert(amount.toString() == "22.00");
     assert(fix2(0.15).toString() == "0.15");
     assert(fix2(-0.02).toString() == "-0.02");
@@ -517,15 +505,27 @@ unittest
     // Arithmmetic operators
 
     fix2 op1, op2;
+    fix3 op3;
 
     op1 = 5.23;
     op2 = 7.1;
+    op3 = 1.337;
 
     assert((op1 + op2).value == 1233);
     assert((op1 - op2).value == -187);
-    writeln(op1, " ", op2, " ", op1 / op2);
     assert((op1 * op2).value == 3713);
     assert((op1 / op2).value == 73);
+    assert((op3 + op2).value == 8437);
+    assert((op3 - op2).value == -5763);
+    assert((op3 * op2).value ==  9492);
+    assert((op3 / op2).value ==  188);
+    assert((op2 + op3).value == 8437);
+    assert((op2 + op3).value == (op3 + op2).value);
+    assert((op2 - op3).value == 5763);
+    assert((op2 - op3).value == -(op3 - op2).value);
+    assert((op2 * op3).value == 9492);
+    assert((op2 * op3).value == (op3 * op2).value);
+    assert((op2 / op3).value == 5310);
 
     assert((op1 + 10).value == 1523);
     assert((op1 - 10).value == -477);
@@ -644,7 +644,7 @@ unittest
     amount = 295;
     amount /= 11;
     assert(amount.value == 2681);
-    //assert(amount == 26.81);
+    assert(amount.to!double == 26.81);
 
     amount = 295;
     another = 11;

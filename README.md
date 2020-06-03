@@ -2,6 +2,10 @@
 **FixedPoint** provides a simple decimal fixed point type for the D language.
 
 ## Usage
+The **Fixed** struct provides all the functionality needed.
+It behaves like other numerical types.
+Binary operations between two **Fixed** numbers will always result into a new **Fixed**.
+This will have the precision and type of the higher or bigger operand respectively.
 
 ```d
 import std.conv : to;
@@ -23,12 +27,8 @@ void main()
 }
 ```
 
-## Future Work
-I plan to expand **FixedPoint** with an 'arithmetic' module, for easier handling of fixed-point arithmetic.
-Especially for arithmetic, where the scale of the fixed point might change, in order to keep the information.
-
 ## Related Work
-There are similar packages which provide some kind of fixed-point types and arithmetic.
+There are similar packages which provide some kind of decimal or fixed-point types and arithmetic.
 However they don't seem to be maintained, or are too big for my purposes.
 There is [fixed](https://github.com/jaypha/fixed), which is very similar and inspired this project.
 [stdxdecimal](https://github.com/JackStouffer/stdxdecimal) seems to have same goals as well.

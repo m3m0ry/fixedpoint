@@ -10,6 +10,7 @@ fixedpoint.lib
 fixedpoint-test-*
 *.exe
 *.o
+*.a
 *.obj
 *.lst
 .vscode
