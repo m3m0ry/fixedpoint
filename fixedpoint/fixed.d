@@ -24,7 +24,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
     static immutable Fixed max = make(V.max);
 
     /// Create a new Fixed, given a integral
-    this(T)(T i) if (isIntegral!T)
+    this(T)(const T i) if (isIntegral!T)
     {
         value = i * factor;
     }
@@ -39,7 +39,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
     }
 
     /// Create a new Fixed give a floating point number
-    this(T)(T i) if (isFloatingPoint!T)
+    this(T)(const T i) if (isFloatingPoint!T)
     {
         value = (i * factor).round.to!V;
     }
@@ -83,7 +83,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
     }
 
     /// Direct construction of a Fixed struct
-    static pure nothrow Fixed make(V v)
+    static pure nothrow Fixed make(const V v)
     {
         Fixed fixed;
         fixed.value = v;
@@ -99,13 +99,13 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         assert(p2.value == 1000);
     }
 
-    Fixed opAssign(Fixed p)
+    Fixed opAssign(const Fixed p)
     {
         value = p.value;
         return this;
     }
 
-    Fixed opAssign(T)(T n) if (isNumeric!T)
+    Fixed opAssign(T)(const T n) if (isNumeric!T)
     {
         value = to!V(n * factor);
         return this;
@@ -117,7 +117,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         return this;
     }
 
-    Fixed opOpAssign(string op, T)(T n)
+    Fixed opOpAssign(string op, T)(const T n)
     {
         // just forward to opBinary.
         return this = opBinary!op(n);
@@ -151,7 +151,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         return other.value * other.factor == value * factor;
     }
 
-    bool opEquals(T)(T other) const if (isIntegral!T)
+    bool opEquals(T)(const T other) const if (isIntegral!T)
     {
         return value == other * factor;
     }
@@ -194,7 +194,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         return this;
     }
 
-    Fixed opUnary(string s)() if (s == "-" || s == "+")
+    Fixed opUnary(string s)() const if (s == "-" || s == "+")
     {
         auto f = Fixed();
         f.value = mixin(s ~ "value");
@@ -242,77 +242,61 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         assert(p.to!(Fixed!5).value == 110_000);
     }
 
-    Fixed opBinary(string op, T)(T rhs) if ((op == "+" || op == "-") && isIntegral!T)
+    Fixed opBinary(string op, T)(const T rhs) const if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
     }
 
-    Fixed opBinary(string op, T)(T rhs) if ((op == "*" || op == "/") && isIntegral!T)
+    Fixed opBinary(string op, T)(const T rhs) const if ((op == "*" || op == "/") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "rhs"));
     }
 
-    Fixed opBinary(string op, T)(T rhs)
-            if ((op == "+" || op == "-") && isFloatingPoint!T)
+    T opBinary(string op, T)(const T rhs) const
+            if ((op == "+" || op == "-" || op == "*" || op == "/") && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("value" ~ op ~ "(rhs * factor).round.to!V"));
+        return mixin("this.to!T" ~ op ~ "rhs");
     }
 
-    Fixed opBinary(string op, T)(T rhs)
-            if ((op == "*" || op == "/") && isFloatingPoint!T)
-    {
-        return Fixed.make(mixin("(value" ~ op ~ "rhs).round.to!V"));
-    }
-
-    Fixed opBinaryRight(string op, T)(T lhs)
+    Fixed opBinaryRight(string op, T)(const T lhs) const
             if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if (op == "*" && isIntegral!T)
+    Fixed opBinaryRight(string op, T)(const T lhs) const if (op == "*" && isIntegral!T)
     {
         return Fixed.make(mixin("lhs" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if (op == "/" && isIntegral!T)
+    Fixed opBinaryRight(string op, T)(const T lhs) const if (op == "/" && isIntegral!T)
     {
         // this might overflow easily. But this is the correct mechanism.
         return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs)
-            if ((op == "+" || op == "-") && isFloatingPoint!T)
+    T opBinaryRight(string op, T)(const T lhs) const
+            if ((op == "-" || op == "/" || op == "+" || op == "*") && isFloatingPoint!T)
     {
-        return Fixed.make(mixin("(lhs * factor).round.to!V" ~ op ~ "value"));
+        return mixin("lhs" ~ op ~ "this.to!T");
     }
 
-    Fixed opBinaryRight(string op, T)(T lhs) if (op == "*" && isFloatingPoint!T)
-    {
-        return Fixed.make(mixin("(lhs" ~ op ~ "value).round.to!V"));
-    }
-
-    Fixed opBinaryRight(string op, T)(T lhs) if (op == "/" && isFloatingPoint!T)
-    {
-        return Fixed.make(mixin("(((lhs * factor)" ~ op ~ "value) * factor).round.to!V"));
-    }
-
-    Fixed opBinary(string op)(Fixed rhs) if (op == "+" || op == "-")
+    Fixed opBinary(string op)(Fixed rhs) const if (op == "+" || op == "-")
     {
         return Fixed.make(mixin("value" ~ op ~ "rhs.value"));
     }
 
-    Fixed opBinary(string op)(Fixed rhs) if (op == "*")
+    Fixed opBinary(string op)(const Fixed rhs) const if (op == "*")
     {
         return Fixed.make(mixin("((value" ~ op ~ "rhs.value) / factor).round.to!V"));
     }
 
-    Fixed opBinary(string op)(Fixed rhs) if (op == "/")
+    Fixed opBinary(string op)(const Fixed rhs) const if (op == "/")
     {
         return Fixed.make(mixin("((value * factor" ~ op ~ "rhs.value * factor) / factor).round.to!V"));
     }
 
-    auto opBinary(string op, int r, W)(Fixed!(r, W) rhs)
+    auto opBinary(string op, int r, W)(const Fixed!(r, W) rhs) const
     {
         static if(scaling > r) alias S = scaling;
         else alias S = r;
@@ -345,6 +329,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
 unittest
 {
     import std.stdio : writeln;
+    import std.math : isClose;
     import std.exception : assertThrown;
 
     alias fix1 = Fixed!1;
@@ -539,16 +524,15 @@ unittest
     assert((10 / op1).value == 191);
     //assert(10 % op1 == 4.77);
 
-    assert((op1 + 9.8).value == 1503);
-    assert((op1 - 9.8).value == -457);
-    assert((op1 * 9.8).value == 5125);
-    assert((op1 / 9.8).value == 53);
+    assert(isClose(op1 + 9.8, 15.03));
+    assert(isClose(op1 - 9.8, -4.57));
+    assert(isClose(op1 * 9.8, 51.254));
+    assert(isClose(op1 / 9.8, 0.53367346939));
 
-    assert((9.8 + op1).value == 1503);
-    assert((9.8 - op1).value == 457);
-    assert((9.8 * op1).value == 5125);
-
-    assert((9.8 / op1).value == 187);
+    assert(isClose(9.8 + op1, 15.03));
+    assert(isClose(9.8 - op1, 4.57));
+    assert(isClose(9.8 * op1, 51.254));
+    assert(isClose(9.8 / op1, 1.87380497132));
 
     assert(op1 != op2);
     assert(op1 == fix2(5.23));
