@@ -293,7 +293,7 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
 
     Fixed opBinary(string op)(const Fixed rhs) const if (op == "/")
     {
-        return Fixed.make(mixin("((value * factor" ~ op ~ "rhs.value * factor) / factor).round.to!V"));
+        return Fixed.make(mixin("((value * factor)" ~ op ~ "rhs.value).round.to!V"));
     }
 
     auto opBinary(string op, int r, W)(const Fixed!(r, W) rhs) const
