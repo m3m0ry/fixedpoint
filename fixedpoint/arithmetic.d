@@ -1,4 +1,4 @@
-module fixedpoint.algorithm;
+module fixedpoint.arithmetic;
 import std.conv : to;
 import fixedpoint.fixed : Fixed;
 
