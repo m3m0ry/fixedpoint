@@ -12,7 +12,7 @@ import std.traits;
 struct Fixed(int scaling, V = long) if (isIntegral!V)
 {
     /// Value of the Fixed
-    V value = 0;
+    V value = V.init;
     /// Factor of the scaling
     enum factor = 10 ^^ scaling;
 
@@ -237,8 +237,6 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         assert(cast(int) p == 1);
         assert(p.to!int == 1);
         assert(p.to!double == 1.1);
-        import std.stdio;
-
         assert(p.to!(Fixed!5).value == 110_000);
     }
 
@@ -252,12 +250,6 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
             if ((op == "*" || op == "/") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "rhs"));
-    }
-
-    T opBinary(string op, T)(const T rhs) const 
-            if ((op == "+" || op == "-" || op == "*" || op == "/") && isFloatingPoint!T)
-    {
-        return mixin("this.to!T" ~ op ~ "rhs");
     }
 
     Fixed opBinaryRight(string op, T)(const T lhs) const 
@@ -277,6 +269,12 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
     {
         // this might overflow easily. But this is the correct mechanism.
         return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
+    }
+
+    T opBinary(string op, T)(const T rhs) const 
+            if ((op == "+" || op == "-" || op == "*" || op == "/") && isFloatingPoint!T)
+    {
+        return mixin("this.to!T" ~ op ~ "rhs");
     }
 
     T opBinaryRight(string op, T)(const T lhs) const 
