@@ -242,40 +242,44 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         assert(p.to!(Fixed!5).value == 110_000);
     }
 
-    Fixed opBinary(string op, T)(const T rhs) const if ((op == "+" || op == "-") && isIntegral!T)
+    Fixed opBinary(string op, T)(const T rhs) const 
+            if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
     }
 
-    Fixed opBinary(string op, T)(const T rhs) const if ((op == "*" || op == "/") && isIntegral!T)
+    Fixed opBinary(string op, T)(const T rhs) const 
+            if ((op == "*" || op == "/") && isIntegral!T)
     {
         return Fixed.make(mixin("value" ~ op ~ "rhs"));
     }
 
-    T opBinary(string op, T)(const T rhs) const
+    T opBinary(string op, T)(const T rhs) const 
             if ((op == "+" || op == "-" || op == "*" || op == "/") && isFloatingPoint!T)
     {
         return mixin("this.to!T" ~ op ~ "rhs");
     }
 
-    Fixed opBinaryRight(string op, T)(const T lhs) const
+    Fixed opBinaryRight(string op, T)(const T lhs) const 
             if ((op == "+" || op == "-") && isIntegral!T)
     {
         return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(const T lhs) const if (op == "*" && isIntegral!T)
+    Fixed opBinaryRight(string op, T)(const T lhs) const 
+            if (op == "*" && isIntegral!T)
     {
         return Fixed.make(mixin("lhs" ~ op ~ "value"));
     }
 
-    Fixed opBinaryRight(string op, T)(const T lhs) const if (op == "/" && isIntegral!T)
+    Fixed opBinaryRight(string op, T)(const T lhs) const 
+            if (op == "/" && isIntegral!T)
     {
         // this might overflow easily. But this is the correct mechanism.
         return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
     }
 
-    T opBinaryRight(string op, T)(const T lhs) const
+    T opBinaryRight(string op, T)(const T lhs) const 
             if ((op == "-" || op == "/" || op == "+" || op == "*") && isFloatingPoint!T)
     {
         return mixin("lhs" ~ op ~ "this.to!T");
@@ -298,10 +302,14 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
 
     auto opBinary(string op, int r, W)(const Fixed!(r, W) rhs) const
     {
-        static if(scaling > r) alias S = scaling;
-        else alias S = r;
-        static if(V.sizeof > W.sizeof) alias X = V;
-        else alias X = W;
+        static if (scaling > r)
+            alias S = scaling;
+        else
+            alias S = r;
+        static if (V.sizeof > W.sizeof)
+            alias X = V;
+        else
+            alias X = W;
         alias common = Fixed!(S, X);
         return mixin("this.to!common" ~ op ~ "rhs.to!common");
     }
@@ -502,8 +510,8 @@ unittest
     assert((op1 / op2).value == 73);
     assert((op3 + op2).value == 8437);
     assert((op3 - op2).value == -5763);
-    assert((op3 * op2).value ==  9492);
-    assert((op3 / op2).value ==  188);
+    assert((op3 * op2).value == 9492);
+    assert((op3 / op2).value == 188);
     assert((op2 + op3).value == 8437);
     assert((op2 + op3).value == (op3 + op2).value);
     assert((op2 - op3).value == 5763);
