@@ -6,18 +6,17 @@ import std.range : repeat, chain, empty;
 import std.format : format, formattedWrite;
 import std.string : split;
 import std.math : sgn, abs, round;
-import std.traits;
+import std.traits : isIntegral, isFloatingPoint, isNumeric, isNarrowString, hasMember;
+
+//TODO opCmp & opEals between different Fixed types, modulo, power, ceil, floor, init test, documentation&examples
 
 /// Fixed Class
-struct Fixed(int scaling, V = long) if (isIntegral!V)
+struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
 {
     /// Value of the Fixed
     V value = V.init;
     /// Factor of the scaling
     enum factor = 10 ^^ scaling;
-
-    //TODO modulo, power? ceil, floor, init?, documentation&examples
-
     /// Smalest Fixed
     static immutable Fixed min = make(V.min);
     /// Largest Fixed
@@ -240,76 +239,63 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
         assert(p.to!(Fixed!5).value == 110_000);
     }
 
-    Fixed opBinary(string op, T)(const T rhs) const 
-            if ((op == "+" || op == "-") && isIntegral!T)
+    ///
+    auto opBinary(string op, Rhs)(const Rhs rhs) const 
+            if (isIntegral!Rhs || isFloatingPoint!Rhs || is(Rhs == bool))
     {
-        return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
+        static if (hasMember!(Hook, "hookOpBinaryNumeric"))
+            return hook.hookOpBinaryNumeric!op(this, rhs);
+        else static if (is(Rhs == bool))
+            return mixin("this" ~ op ~ "ubyte(rhs)");
+        else static if (isFloatingPoint!Rhs)
+            return mixin("this.to!Rhs" ~ op ~ "rhs");
+        else static if (isIntegral!Rhs)
+        {
+            static if (op == "+" || op == "-")
+                return Fixed.make(mixin("value" ~ op ~ "(rhs * factor)"));
+            else static if (op == "*" || op == "/")
+                return Fixed.make(mixin("value" ~ op ~ "rhs"));
+            else
+                static assert(0, "Operation " ~ op ~ " is not (yet) implemented");
+        }
     }
 
-    Fixed opBinary(string op, T)(const T rhs) const 
-            if ((op == "*" || op == "/") && isIntegral!T)
+    ///
+    auto opBinary(string op, int S, W, H)(Fixed!(S, W, H) rhs) const
     {
-        return Fixed.make(mixin("value" ~ op ~ "rhs"));
-    }
-
-    Fixed opBinaryRight(string op, T)(const T lhs) const 
-            if ((op == "+" || op == "-") && isIntegral!T)
-    {
-        return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
-    }
-
-    Fixed opBinaryRight(string op, T)(const T lhs) const 
-            if (op == "*" && isIntegral!T)
-    {
-        return Fixed.make(mixin("lhs" ~ op ~ "value"));
-    }
-
-    Fixed opBinaryRight(string op, T)(const T lhs) const 
-            if (op == "/" && isIntegral!T)
-    {
-        // this might overflow easily. But this is the correct mechanism.
-        return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
-    }
-
-    T opBinary(string op, T)(const T rhs) const 
-            if ((op == "+" || op == "-" || op == "*" || op == "/") && isFloatingPoint!T)
-    {
-        return mixin("this.to!T" ~ op ~ "rhs");
-    }
-
-    T opBinaryRight(string op, T)(const T lhs) const 
-            if ((op == "-" || op == "/" || op == "+" || op == "*") && isFloatingPoint!T)
-    {
-        return mixin("lhs" ~ op ~ "this.to!T");
-    }
-
-    Fixed opBinary(string op)(Fixed rhs) const if (op == "+" || op == "-")
-    {
-        return Fixed.make(mixin("value" ~ op ~ "rhs.value"));
-    }
-
-    Fixed opBinary(string op)(const Fixed rhs) const if (op == "*")
-    {
-        return Fixed.make(mixin("((value" ~ op ~ "rhs.value) / factor).round.to!V"));
-    }
-
-    Fixed opBinary(string op)(const Fixed rhs) const if (op == "/")
-    {
-        return Fixed.make(mixin("((value * factor)" ~ op ~ "rhs.value).round.to!V"));
-    }
-
-    auto opBinary(string op, int r, W)(const Fixed!(r, W) rhs) const
-    {
-        static if (scaling > r)
-            alias S = scaling;
+        static if (is(Hook == H) && hasMember!(H, "hookOpBinaryFixed"))
+            return Hook.hookOpBinaryFixed!(op, scaling, V, Hook, S, W, H)(this, rhs);
+        else static if (hasMember!(Hook, "hookOpBinaryFixed")
+                && !hasMember!(H, "hookOpBinaryFixed"))
+            return Hook.hookOpBinaryFixed!op(this, rhs);
+        else static if (!hasMember!(Hook, "hookOpBinaryFixed")
+                && hasMember!(H, "hookOpBinaryFixed"))
+            return H.hookOpBinaryFixed!op(this, rhs);
         else
-            alias S = r;
-        static if (V.sizeof > W.sizeof)
-            alias X = V;
-        else
-            alias X = W;
-        alias common = Fixed!(S, X);
-        return mixin("this.to!common" ~ op ~ "rhs.to!common");
+            static assert(0, "Conflict between Hooks");
+    }
+
+    ///
+    auto opBinaryRight(string op, Lhs)(const Lhs lhs) const 
+            if (isIntegral!Lhs || isFloatingPoint!Lhs || is(Lhs == bool))
+    {
+        static if (hasMember!(Hook, "hookOpBinaryRightNumeric"))
+            return hook.hookOpBinaryRightNumeric!op(lhs, this);
+        else static if (is(Lhs == bool))
+            return mixin("ubyte(rhs)" ~ op ~ "this");
+        else static if (isFloatingPoint!Lhs)
+            return mixin("lhs" ~ op ~ "this.to!Lhs");
+        else static if (isIntegral!Lhs)
+        {
+            static if (op == "+" || op == "-")
+                return Fixed.make(mixin("(lhs * factor)" ~ op ~ "value"));
+            else static if (op == "*")
+                return Fixed.make(mixin("lhs" ~ op ~ "value"));
+            else static if (op == "/")
+                return Fixed.make(mixin("(lhs * factor * factor)" ~ op ~ "value"));
+            else
+                static assert(0, "Operation " ~ op ~ " is not (yet) implemented");
+        }
     }
 
     ///
@@ -329,6 +315,82 @@ struct Fixed(int scaling, V = long) if (isIntegral!V)
     size_t toHash() const
     {
         return value.hashOf;
+    }
+}
+
+///
+struct KeepScalingHook
+{
+    ///
+    static auto hookOpBinaryFixed(string op, int scaling, V, Hook, int S, W, H)(
+            const Fixed!(scaling, V, Hook) lhs, const Fixed!(S, W, H) rhs)
+            if (op == "+" || op == "-" || op == "*" || op == "/")
+    {
+        static if (is(typeof(lhs) == typeof(rhs)))
+        {
+            static if (op == "+" || op == "-")
+                return typeof(lhs).make(mixin("lhs.value" ~ op ~ "rhs.value"));
+            else static if (op == "*")
+                return typeof(lhs).make(((lhs.value * rhs.value) / lhs.factor).round.to!V);
+            else static if (op == "/")
+                return typeof(lhs).make(((lhs.value * lhs.factor) / rhs.value).round.to!V);
+        }
+        else
+        {
+            static if (scaling > S)
+                alias nextScaling = scaling;
+            else
+                alias nextScaling = S;
+            static if (V.sizeof > W.sizeof)
+                alias nextV = V;
+            else
+                alias nextV = W;
+            alias common = Fixed!(nextScaling, nextV, Hook);
+            return mixin("lhs.to!common" ~ op ~ "rhs.to!common");
+        }
+    }
+}
+
+///
+struct MoveScalingHook
+{
+    ///
+    static auto hookOpBinaryFixed(string op, int scaling, V, Hook, int S, W, H)(
+            const Fixed!(scaling, V, Hook) lhs, const Fixed!(S, W, H) rhs)
+            if (op == "+" || op == "-" || op == "*" || op == "/")
+    {
+        static if (is(typeof(lhs) == typeof(rhs)))
+        {
+            static if (op == "+" || op == "-")
+                return typeof(lhs).make(mixin("lhs.value" ~ op ~ "rhs.value"));
+            else static if (op == "*")
+                return Fixed!(2 * scaling, V, Hook).make((lhs.value * rhs.value).round.to!V);
+            else static if (op == "/")
+                return Fixed!(0, V, Hook).make((lhs.value / rhs.value).round.to!V);
+        }
+        else
+        {
+            static if (V.sizeof > W.sizeof)
+                alias nextV = V;
+            else
+                alias nextV = W;
+
+            static if (op == "+" || op == "-")
+            {
+                static if (scaling > S)
+                    alias nextScaling = scaling;
+                else
+                    alias nextScaling = S;
+                alias common = Fixed!(nextScaling, nextV, Hook);
+                return mixin("lhs.to!common" ~ op ~ "rhs.to!common");
+            }
+            else static if (op == "*")
+            {
+                return Fixed!(scaling + S, nextV, Hook).make(value * rhs.value);
+                return Fixed!(scaling - S, nextV, Hook).make(value / rhs.value);
+
+            }
+        }
     }
 }
 
