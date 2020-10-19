@@ -22,8 +22,8 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
     /// Largest Fixed
     static immutable Fixed max = make(V.max);
 
-    /// Create a new Fixed, given a integral
-    this(T)(const T i) if (isIntegral!T)
+    /// Create a new Fixed, given an integral
+    this(const V i)
     {
         value = i * factor;
     }
