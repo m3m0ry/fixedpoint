@@ -49,14 +49,16 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
         assert(p.value == 1.1 * 10 ^^ 4);
     }
 
-    /// Create a new Fixed struct given a string
+    /// Create a new Fixed struct given a string. If round is true, then the number is rounded to the nearest signficiant digit.
     this(Range)(Range s, bool round = false) if (isNarrowString!Range)
     {
         if (!s.empty)
         {
+            import std.range.primitives;
             auto spl = s.splitter(".");
             auto frontItem = spl.front;
             spl.popFront;
+            bool neg = frontItem.length > 0 && frontItem.front == '-';
             typeof(frontItem) decimal;
             typeof(frontItem) truncatedDecimal;
             if (!spl.empty)
@@ -66,8 +68,13 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
             else
                 truncatedDecimal = decimal;
             value = chain(frontItem, truncatedDecimal, '0'.repeat(scaling - truncatedDecimal.length)).to!V;
-            if(round && decimal.length > scaling && decimal[scaling].to!string.to!int >= 5)
-                value++;
+            if(round && decimal.length > scaling && decimal[scaling] >= '5')
+            {
+                if(neg)
+                    --value;
+                else
+                    ++value;
+            }
         }
     }
     ///
@@ -84,6 +91,9 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
 
         auto p4 = Fixed!4("");
         assert(p4.value == 0);
+
+        auto p5 = Fixed!3("1.2345", true);
+        assert(p5.value == 1235);
     }
 
     /// Direct construction of a Fixed struct
@@ -461,6 +471,9 @@ unittest
     assert(fix2(-27.2).value == -2720);
     assert(fix2(16.1f).value == 1610);
     assert(fix2(-87.3f).value == -8730);
+
+    // test negative rounding
+    assert(fix2("-1.005", true).value == -101);
 
     int i1 = 23;
     v2 = i1;
