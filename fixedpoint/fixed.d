@@ -1,6 +1,6 @@
 module fixedpoint.fixed;
 
-import std.conv : to;
+import std.conv : to, parse;
 import std.algorithm : splitter;
 import std.range : repeat, chain, empty;
 import std.format : format, formattedWrite;
@@ -50,7 +50,7 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
     }
 
     /// Create a new Fixed struct given a string
-    this(Range)(Range s) if (isNarrowString!Range)
+    this(Range)(Range s, bool round = false) if (isNarrowString!Range)
     {
         if (!s.empty)
         {
@@ -58,11 +58,16 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
             auto frontItem = spl.front;
             spl.popFront;
             typeof(frontItem) decimal;
+            typeof(frontItem) truncatedDecimal;
             if (!spl.empty)
                 decimal = spl.front;
             if (decimal.length > scaling)
-                decimal = decimal[0 .. scaling]; // truncate
-            value = chain(frontItem, decimal, '0'.repeat(scaling - decimal.length)).to!V;
+                truncatedDecimal = decimal[0 .. scaling]; // truncate
+            else
+                truncatedDecimal = decimal;
+            value = chain(frontItem, truncatedDecimal, '0'.repeat(scaling - truncatedDecimal.length)).to!V;
+            if(round && decimal.length > scaling && decimal[scaling].to!string.to!int >= 5)
+                value++;
         }
     }
     ///
@@ -442,6 +447,15 @@ unittest
     assert(fix3("120".dup).value == 120_000);
     assert(fix3("120.123").value == 120_123);
     assert(fix3("120.1234").value == 120_123);
+    assert(fix3("120.1", true).value == 120_100);
+    assert(fix3("120.12", true).value == 120_120);
+    assert(fix3("120.123", true).value == 120_123);
+    assert(fix3("120.1234", true).value == 120_123);
+    assert(fix3("120.1235", true).value == 120_124);
+    assert(fix3("120.12349", true).value == 120_123);
+    assert(fix3("120.12359", true).value == 120_124);
+    assert(fix3("120.12340", true).value == 120_123);
+    assert(fix3("120.12350", true).value == 120_124);
     assertThrown(Fixed!10("12345678901234567"));
     assert(fix2(24.6).value == 2460);
     assert(fix2(-27.2).value == -2720);
