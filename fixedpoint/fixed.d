@@ -143,10 +143,10 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
         return format!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
     }
 
-    void toString(void delegate(const(char)[]) dg) const
+    void toString(Out)(auto ref Out outRange) const if (is(typeof(formattedWrite!"test"(outRange))))
     {
         string sign = value.sgn == -1 ? "-" : "";
-        dg.formattedWrite!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
+        outRange.formattedWrite!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
     }
 
     /// Creating Fixed from a string, needed by vibed: http://vibed.org/api/vibe.data.serialization/isStringSerializable
