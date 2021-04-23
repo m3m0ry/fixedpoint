@@ -758,3 +758,16 @@ unittest
     assert((334 / fix2(15.3)).value == 2183);
     //assert(334 % fix2(15.3) == 12.7);
 }
+
+// test safe toString
+@safe unittest
+{
+    Fixed!2 val = Fixed!2(100.5);
+    string result;
+    void addToResult(const(char)[] v)
+    {
+        result ~= v;
+    }
+    val.toString(&addToResult);
+    assert(result == "100.50");
+}
