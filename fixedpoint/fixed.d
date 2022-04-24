@@ -16,7 +16,7 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
     /// Value of the Fixed
     V value = V.init;
     /// Factor of the scaling
-    enum factor = 10 ^^ scaling;
+    enum factor = 10L ^^ scaling;
     /// Smalest Fixed
     static immutable Fixed min = make(V.min);
     /// Largest Fixed
@@ -141,6 +141,12 @@ struct Fixed(int scaling, V = long, Hook = KeepScalingHook) if (isIntegral!V)
     {
         string sign = value.sgn == -1 ? "-" : "";
         return format!"%s%d.%0*d"(sign, (value / factor).abs, scaling, (value % factor).abs);
+    }
+
+    unittest
+    {
+        auto f = Fixed!10("0.5");
+        assert (f.toString() == "0.5000000000");
     }
 
     void toString(Out)(auto ref Out outRange) const if (is(typeof(formattedWrite!"test"(outRange))))
